@@ -9,6 +9,9 @@
 __pycache__/
 *.pyc
 
+# Per-target build artifacts
+targets/*/capture-out/
+
 # OS
 .DS_Store
 
