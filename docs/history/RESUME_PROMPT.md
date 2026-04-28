@@ -1,4 +1,4 @@
-# Resumption prompt — paste this into a fresh Claude Code session
+# Resumption prompt — paste this into a fresh agent session
 
 You are an autonomous coding agent. You are continuing a paused build of **mcp-otel-audit**:
 a public audit report comparing four MCP OpenTelemetry instrumentations against the official
