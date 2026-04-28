@@ -1,0 +1,4 @@
+fastmcp==3.2.4
+splunk-otel-instrumentation-fastmcp==0.1.1
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-grpc
