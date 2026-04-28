@@ -1,4 +1,4 @@
-# mcp-eval
+# mcp-otel-audit
 
 > Public audit of MCP OpenTelemetry instrumentations against the official OTel
 > semantic conventions for MCP.
