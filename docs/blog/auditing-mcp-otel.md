@@ -19,7 +19,7 @@ Four packages currently do, or claim to:
 * `logfire.instrument_mcp` from Pydantic
 * `splunk-otel-instrumentation-fastmcp` from Splunk
 
-These four are the surface most teams will touch. If you've shipped an MCP server in Python this year you probably already depend on at least one of them, even if it was pulled in as a transitive dependency.
+These four cover most of the Python instrumentation surface that an MCP server author would reach for today. There may be others I missed; if so, point me at them and I'll add a column.
 
 The question is the boring one: do they emit what the spec says? Until you check, you can't really plan around the data. Dashboards, alerts, sampling rules, error budgets. They all need a stable schema underneath. The point of this audit is to look.
 
@@ -44,9 +44,11 @@ Numbers first. The five-column comparison from the report:
 | Logfire 4.32.1 | 0/15 | 0/10 | No | No | 0/4 |
 | Splunk 0.1.1 | 8/8 | 1/10 | Yes | Yes | 0/4 |
 
+These specific numbers are a snapshot. The MCP semconv is in Development status and is still moving, the four packages release on their own cadences, and re-running the audit a month from now will produce different cells. The point of committing the raw OTLP captures and the harness to the repo is so anyone can re-score against a newer semconv pin or re-capture against newer package versions and see what changed.
+
 REQUIRED_PRESENT is the share of spans that carry `mcp.method.name`, the only attribute the MCP semconv currently marks as required. Two of the four implementations don't emit it. RECOMMENDED_PRESENT counts the recommended MCP-related attributes observed across each capture; only `mcp.session.id` shows up, and only on the two FastMCP-based stacks. NAME_MATCH is whether server-side spans use the documented `{mcp.method.name} {target}` naming convention. KIND_MATCH is whether they use `SpanKind.SERVER`. METRIC_COVERAGE is the fraction of the four MCP semconv histograms emitted.
 
-That last column is uniform: nobody emits any of them. Not the operation-duration histograms, not the session-duration histograms. If you want MCP-specific RED metrics from any of these four packages today, you don't get them out of the box.
+That last column is uniform: none of the four emit any of them. Not the operation-duration histograms, not the session-duration histograms. If you want MCP-specific RED metrics from any of these four packages today, you don't get them out of the box.
 
 A second uniformity: every capture contains some attributes that are deprecated in the current semconv. The two FastMCP stacks emit `rpc.system="mcp"` (Weaver flags this 40 times: deprecated, renamed to `rpc.system.name`, and the value `mcp` is not in the documented enum). Logfire emits `code.filepath` and `code.lineno`, both renamed to dotted forms (`code.file.path`, `code.line.number`). These are easy fixes. They're also a fair index of how recently each instrumentation has tracked the moving spec.
 
@@ -60,7 +62,7 @@ Now the per-implementation breakdown.
 
 **Splunk.** Eight spans, identical span names and span kinds to FastMCP native. Same MCP semconv attributes. On top, four `fastmcp.*`-namespaced attributes the registry doesn't know about: `fastmcp.server.name`, `fastmcp.component.key`, `fastmcp.component.type`, `fastmcp.provider.type`. Same `rpc.system` enum issue. Same `exception.escaped` type mismatch. Splunk's instrumentor extends FastMCP native's surface rather than replacing it.
 
-Two clusters fall out of this. Traceloop and Logfire produce spans that are completely absent from the MCP semconv vocabulary. FastMCP native and Splunk produce spans that match the semconv on the required attribute, the span name shape, and the span kind, with both sharing the same FastMCP-derived attribute set. The cluster split reflects the underlying frameworks: Traceloop and Logfire instrument the official `mcp` SDK; FastMCP native and Splunk instrument jlowin's `fastmcp`. The instrumentation layers don't seem to be normalizing the underlying frameworks toward a common semconv shape. They're emitting whatever was convenient, plus or minus some attempts to follow the spec.
+Two clusters fall out of this. Traceloop and Logfire produce spans whose attributes don't sit in the MCP semconv vocabulary at all (the JSON-RPC method is recoverable from a payload string, but it isn't surfaced as `mcp.method.name`). FastMCP native and Splunk produce spans that match the semconv on the required attribute, the span name shape, and the span kind, with both sharing the same FastMCP-derived attribute set. The cluster split reflects the underlying frameworks: Traceloop and Logfire instrument the official `mcp` SDK; FastMCP native and Splunk instrument jlowin's `fastmcp`. The instrumentation layers don't seem to be normalizing the underlying frameworks toward a common semconv shape. They're emitting whatever was convenient, plus or minus some attempts to follow the spec.
 
 ## What this means for users
 
@@ -83,7 +85,7 @@ The `exception.escaped` type is a similar case. The attribute spec wants a boole
 
 The `mcp.method.name` absence on Traceloop and Logfire is a deeper question. Both packages emit semantic information about the MCP operation; they just don't put it in the attribute the semconv demands. Adding it shouldn't be hard, but it requires a deliberate decision about which span shape is the public one. If `mcp.request.id` and `mcp.response.value` are stable Traceloop attributes that downstream Traceloop tooling relies on, dropping them is a breaking change. Adding `mcp.method.name` alongside them isn't.
 
-The metrics absence is structural. The four MCP histograms aren't emitted by anybody, and that's not because the spec is unclear. The spec defines them. It's because nobody has wired them up yet. A reference implementation, even a simple one, would help.
+The metrics absence is structural. None of the four packages I tested emits the MCP histograms, and that's not because the spec is unclear. The spec defines them. None of these four have wired them up yet. A reference implementation, even a simple one, would help.
 
 ## What's wanted from the OTel MCP working group
 

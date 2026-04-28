@@ -66,7 +66,7 @@ A high `improvement` count is partly an artifact of the MCP semconv being in Dev
 [violation] ResponseStreamWriter: Attribute 'mcp.request.id' does not exist in the registry.
 ```
 
-The single attribute the semconv marks as **required** for MCP spans, `mcp.method.name`, is not emitted. None of the recommended attributes (`mcp.session.id`, `server.address`, `gen_ai.operation.name`, etc.) are emitted.
+The single attribute the semconv marks as **required** for MCP spans, `mcp.method.name`, is not emitted. None of the recommended attributes (`mcp.session.id`, `server.address`, `gen_ai.operation.name`, etc.) are emitted. (The method name is recoverable by parsing the JSON inside `mcp.response.value`, but it is not surfaced as a structured attribute, so any backend that queries on `mcp.method.name` directly will see nothing.)
 
 **Span kind:** All spans are `INTERNAL`. The semconv specifies `SpanKind.SERVER` for `span.mcp.server` and `SpanKind.CLIENT` for `span.mcp.client`.
 
@@ -108,7 +108,7 @@ code.filepath, code.lineno       # both deprecated (renamed)
 
 None of the eight attributes are MCP semconv attributes. `request` and `response` lack a namespace and trigger 30 × `missing_namespace` (improvement). `code.filepath` (renamed to `code.file.path`) and `code.lineno` (renamed to `code.line.number`) trigger 30 × `deprecated` (violation).
 
-The required `mcp.method.name` is not emitted on any span. None of the recommended attributes are emitted.
+The required `mcp.method.name` is not emitted on any span. None of the recommended attributes are emitted. Like Traceloop, the method name is reachable by parsing the `request` payload (which is a JSON-RPC envelope including `"method": "tools/call"`), but it is not exposed as a structured attribute, so it is invisible to any tooling that queries on `mcp.method.name`.
 
 **Span kind:** `INTERNAL` on all 15 spans.
 
@@ -134,7 +134,7 @@ The four `fastmcp.*` attributes are not in the registry (32 × `missing_attribut
 
 ## 4. Cross-cutting observations
 
-**The MCP `mcp.client.*` and `mcp.server.*` duration / session histograms are not emitted by any of the four implementations.** The semconv's metric layer is unrepresented in this audit's captures. A user wanting MCP-specific RED-style metrics (rate, errors, duration) from any of the four targets does not get them out of the box today.
+**The MCP `mcp.client.*` and `mcp.server.*` duration / session histograms are not emitted by any of the four implementations.** The semconv's metric layer is unrepresented in this audit's captures. A user wanting MCP-specific RED-style metrics (rate, errors, duration) from any of the four targets does not get them out of the box today. (Each target's collector configures both a traces pipeline and a metrics pipeline with file export, and the file exporter is verified to write both: the Traceloop and FastMCP captures contain OTel SDK self-telemetry metric records, so the receive-and-write path is working. The four named MCP histograms simply never appear in any of the four captures. A literal grep across all four `captures/<target>.json` files for any of the four metric names returns zero matches.)
 
 **Two of the four (Traceloop, Logfire) emit zero MCP semconv attributes on their spans.** Their spans carry information about MCP operations, but in shapes that downstream OTel-aware tooling (which expects `mcp.method.name`, `mcp.session.id`, etc.) won't recognize.
 
