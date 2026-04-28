@@ -1,0 +1,21 @@
+# Tools fetched at runtime, not source
+.tools/
+
+# Claude Code session state
+.claude/
+
+# Python venvs (kept outside repo, but just in case)
+.venv*/
+__pycache__/
+*.pyc
+
+# Per-target build artifacts
+targets/*/capture-out/
+
+# OS
+.DS_Store
+
+# Editor
+*.swp
+.vscode/
+.idea/
