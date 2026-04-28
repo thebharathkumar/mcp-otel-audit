@@ -116,19 +116,22 @@ The required `mcp.method.name` is not emitted on any span. None of the recommend
 
 ### 3.4 Splunk `splunk-otel-instrumentation-fastmcp` 0.1.1
 
-**Span emission:** 8 spans, kind `SERVER`, scope `fastmcp`. Span names are identical to FastMCP native (`tools/call echo`, `tools/call calculate`). The Splunk instrumentor does not introduce a separate scope; it extends FastMCP's native telemetry rather than replacing it.
+**Span emission:** 8 spans, kind `SERVER`, scope `fastmcp`. Span names are `tools/call echo` and `tools/call calculate`. The captured spans are **structurally identical to FastMCP native**: same scope, same names, same kinds, same attribute keys. A side-by-side fingerprint of `captures/fastmcp.json` and `captures/splunk.json` returns identical sets of `(scope, span name, kind, attribute keys)` tuples.
 
-**Attributes** (per span):
+**Mechanism (verified by reading the package source under `opentelemetry/instrumentation/fastmcp/`):** the package does not emit on its own tracer scope. `FastMCPInstrumentor()._instrument()` registers `wrapt` post-import hooks that wrap `FastMCP.__init__` and `ToolManager.call_tool`, then routes through `opentelemetry.util.genai.handler.TelemetryHandler` (the singleton from `splunk-otel-util-genai`). In this default configuration, no spans from that handler appear in the capture: every span in `captures/splunk.json` has scope `fastmcp` (the FastMCP framework's own tracer name), not `opentelemetry.util.genai.handler` (which is what the genai handler uses). The four `fastmcp.*` attributes (`fastmcp.server.name`, `fastmcp.component.key`, `fastmcp.component.type`, `fastmcp.provider.type`) are emitted by FastMCP itself in `fastmcp/server/telemetry.py`, not by the Splunk instrumentor.
+
+**Attributes** (emitted by FastMCP, present whether or not the Splunk instrumentor is installed):
 
 ```
-mcp.method.name, mcp.session.id, rpc.system, rpc.service, rpc.method   # same as FastMCP native
-fastmcp.server.name, fastmcp.component.key, fastmcp.component.type,
-fastmcp.provider.type                                                 # added by Splunk
+mcp.method.name, mcp.session.id, rpc.system, rpc.service, rpc.method
+fastmcp.server.name, fastmcp.component.key, fastmcp.component.type, fastmcp.provider.type
 ```
 
-The four `fastmcp.*` attributes are not in the registry (32 × `missing_attribute`, violation). The five MCP / RPC attributes inherit FastMCP native's profile: required `mcp.method.name` present on 8/8 spans, `mcp.session.id` as the only recommended attribute, deprecated `rpc.system` / `rpc.service`, undefined `rpc.system` enum value `mcp`, type mismatch on `exception.escaped`.
+The MCP semconv shape is the same as FastMCP native: required `mcp.method.name` on 8/8 spans, `mcp.session.id` as the only recommended attribute, deprecated `rpc.system` / `rpc.service`, undefined `rpc.system` enum value `mcp`, type mismatch on `exception.escaped`. The four `fastmcp.*`-namespaced attributes (32 × `missing_attribute`) are also produced by FastMCP itself, not by Splunk.
 
-**Metrics:** No metrics in this configuration. The Splunk package does not declare `opentelemetry-sdk` as a hard dependency (we install it explicitly), and the instrumentor does not emit MCP semconv histograms. As with Logfire, OpenTelemetry SDK self-telemetry was also absent in this capture, suggesting the Splunk instrumentor's setup interferes with the MeterProvider configuration in `targets/splunk/server.py`.
+**Metrics:** Zero metric records of any kind, including OpenTelemetry SDK self-telemetry. The FastMCP native capture contains 40 SDK self-telemetry data points emitted by the same SDK setup, so the metric pipeline works in the absence of the Splunk instrumentor. The capture does not establish whether the Splunk instrumentor's initialization interferes with the MeterProvider configured in `targets/splunk/server.py`, or whether some other interaction silences the SDK self-telemetry, but the empirical effect is that the Splunk-instrumented capture has no metric records at all.
+
+**Net observation:** in this default configuration, installing `splunk-otel-instrumentation-fastmcp` 0.1.1 on top of FastMCP 3.2.4 does not produce any observable telemetry above what FastMCP itself already emits, and removes the SDK self-telemetry metrics that FastMCP otherwise produces. A different env-var configuration (the package documents `OTEL_INSTRUMENTATION_GENAI_ENABLE` and `OTEL_INSTRUMENTATION_GENAI_EMITTERS`) may activate the genai-handler emission path; this audit captures only the default.
 
 ---
 
@@ -138,7 +141,7 @@ The four `fastmcp.*` attributes are not in the registry (32 × `missing_attribut
 
 **Two of the four (Traceloop, Logfire) emit zero MCP semconv attributes on their spans.** Their spans carry information about MCP operations, but in shapes that downstream OTel-aware tooling (which expects `mcp.method.name`, `mcp.session.id`, etc.) won't recognize.
 
-**The two FastMCP-based stacks (FastMCP native, Splunk) carry the same MCP semconv span shape**: kind SERVER, name `{mcp.method.name} {target}`, with `mcp.method.name` and `mcp.session.id` set. Splunk additionally adds four `fastmcp.*`-namespaced attributes that are not in the registry.
+**The two FastMCP-based stacks (FastMCP native, Splunk) carry an identical span shape**: kind SERVER, name `{mcp.method.name} {target}`, scope `fastmcp`, with the same nine attribute keys including `mcp.method.name`, `mcp.session.id`, deprecated `rpc.*`, and four `fastmcp.*`-namespaced attributes that are not in the registry. All nine attributes are emitted by FastMCP itself; the Splunk instrumentor does not produce any additional observable telemetry on top in default configuration. The Splunk capture differs from the FastMCP capture only in metrics (none vs. 40 SDK self-telemetry records).
 
 **Every capture contains some attributes flagged as deprecated.** `rpc.system` (now `rpc.system.name`) appears in both FastMCP-based stacks, 40 violations total. Logfire emits `code.filepath` / `code.lineno`, 60 violations total. These are renames in OTel semconv, not removals; straightforward to fix in a future release.
 
