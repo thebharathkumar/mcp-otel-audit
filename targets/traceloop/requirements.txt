@@ -1,0 +1,4 @@
+mcp>=1.0
+opentelemetry-instrumentation-mcp==0.60.0
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-grpc

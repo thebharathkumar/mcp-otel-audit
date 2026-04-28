@@ -1,0 +1,75 @@
+{
+  "target": "logfire",
+  "endpoint": "http://localhost:18003/mcp/",
+  "started_unix": 1777352403,
+  "elapsed_s": 0.433,
+  "host": {
+    "python": "3.12.11",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39"
+  },
+  "client_versions": {
+    "mcp": "1.27.0"
+  },
+  "scenarios": [
+    {
+      "name": "tool_call_success",
+      "elapsed_s": 0.125,
+      "harness_ok": true,
+      "data": {
+        "ok": true,
+        "isError": false
+      }
+    },
+    {
+      "name": "tool_call_with_error",
+      "elapsed_s": 0.068,
+      "harness_ok": true,
+      "data": {
+        "isError": true,
+        "text": "Error executing tool calculate: float division by zero"
+      }
+    },
+    {
+      "name": "tool_call_with_invalid_args",
+      "elapsed_s": 0.056,
+      "harness_ok": true,
+      "data": {
+        "path": "isError",
+        "isError": true
+      }
+    },
+    {
+      "name": "session_lifecycle",
+      "elapsed_s": 0.059,
+      "harness_ok": true,
+      "data": {
+        "server": "mcp-audit-logfire",
+        "protocol": "2025-11-25",
+        "tool_count": 3,
+        "tool_names": [
+          "calculate",
+          "echo",
+          "fetch_mock_data"
+        ]
+      }
+    },
+    {
+      "name": "multiple_concurrent_calls",
+      "elapsed_s": 0.124,
+      "harness_ok": true,
+      "data": {
+        "requested": 5,
+        "ok": 5
+      }
+    },
+    {
+      "name": "streaming_response",
+      "elapsed_s": 0.0,
+      "harness_ok": true,
+      "data": {
+        "status": "not_exercised",
+        "reason": "audit tools return scalar values; streaming progress not used"
+      }
+    }
+  ]
+}
