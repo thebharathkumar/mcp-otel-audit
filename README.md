@@ -1,35 +1,83 @@
 # mcp-otel-audit
 
-> Public audit of MCP OpenTelemetry instrumentations against the official OTel
-> semantic conventions for MCP.
+Public audit of MCP OpenTelemetry instrumentations against the official OTel
+semantic conventions for MCP (`semantic-conventions@v1.40.0`).
 
-**Status: Phase 0 (pre-flight) — partial.** STOP gate 1 (Weaver scores MCP semconv) is
-cleared. STOP gate 2 (four targets installable) is blocked on local disk space, not on
-packaging. No code or report yet — the work that produces those starts in Phase 1.
+The artifact is the report:
 
-The plan in one paragraph: build a small reproducible scenario harness that exercises
-four MCP server implementations — Traceloop's `opentelemetry-instrumentation-mcp`,
-FastMCP's native instrumentation, Pydantic Logfire, and Splunk's
-`splunk-otel-instrumentation-fastmcp` — each running the **same three tools**. Capture
-raw OTLP from each. Score the captures against OpenTelemetry semantic-conventions
-**v1.40.0** using OTel Weaver's `live-check`. Publish a neutral comparison report.
+- **[`reports/REPORT.md`](reports/REPORT.md)**: comparison of four MCP instrumentations.
+- **[`docs/blog/auditing-mcp-otel.md`](docs/blog/auditing-mcp-otel.md)**: narrative writeup.
 
-OTel Weaver is the scoring engine. We don't reimplement it.
+Everything else in this repo exists to make those two documents reproducible.
 
-## Where to start
+## What this is
 
-1. **`MISSING_NICHE.md`** — three rounds of niche analysis (`mcp-eval`, `mcp-otel`,
-   `mcp-conformance`) and why this scope was the one to ship.
-2. **`PHASE0.md`** — current pre-flight state, evidence, blockers.
-3. **`RESUME_PROMPT.md`** — self-contained prompt to resume this build in a fresh
-   Claude Code session.
+Four MCP server stacks, each running the same three tools (`echo`,
+`fetch_mock_data`, `calculate`), each instrumented by a different OTel package:
 
-## Pin
+| Target | Package |
+| --- | --- |
+| Traceloop | `opentelemetry-instrumentation-mcp` |
+| FastMCP native | `fastmcp` (built-in `fastmcp.telemetry`) |
+| Pydantic Logfire | `logfire` |
+| Splunk | `splunk-otel-instrumentation-fastmcp` |
 
-- OpenTelemetry semantic-conventions **`v1.40.0`** (released 2026-02-19).
-- OTel Weaver **`v0.23.0`**.
-- MCP Python SDK version will be recorded at capture time.
+Each stack pipes OTLP into an OTel Collector with the file exporter, which
+dumps raw OTLP JSON into `captures/<target>.json`. We score those captures
+with `weaver registry live-check` against
+`open-telemetry/semantic-conventions@v1.40.0`. See **[`PINS.md`](PINS.md)**
+for the full version pin set.
+
+OTel Weaver is the scoring engine. We do not reimplement it.
+
+## Reproducing
+
+Requires Docker, [`uv`](https://docs.astral.sh/uv/), and Python 3.12.
+
+```bash
+# One-time setup: download the Weaver binary into .tools/
+./scripts/bootstrap.sh
+
+# Run all four stacks, capture OTLP, score with Weaver
+make capture-all
+make score-all
+
+# Inspect captures/<target>.weaver.json to write the report
+make report-summary
+```
+
+Each target lives under `targets/<name>/` with its own `docker-compose.yml`
+and `README.md` for running it standalone.
+
+## Layout
+
+```
+.
+├── PINS.md                          # version pins
+├── reports/REPORT.md                # the audit report
+├── docs/blog/auditing-mcp-otel.md   # the writeup
+├── scripts/
+│   ├── scenarios.py                 # exercises the six scenarios
+│   ├── bootstrap.sh                 # fetches Weaver binary
+│   ├── capture.sh                   # docker-up + scenarios + capture
+│   ├── score.sh                     # weaver live-check on captures
+│   └── report_summary.py            # tabulates Weaver output
+├── targets/
+│   ├── _shared/tool_funcs.py        # tool bodies, identical across stacks
+│   ├── traceloop/
+│   ├── fastmcp/
+│   ├── logfire/
+│   └── splunk/
+├── captures/                        # raw OTLP + Weaver score JSON, committed
+└── .tools/                          # Weaver binary (gitignored)
+```
+
+## Status
+
+Built 2026-04-28. The MCP semconv is in Development status; instrumentations
+emit against moving snapshots of the spec; this report is a point-in-time
+audit, not a certification.
 
 ## License
 
-Not yet licensed. Apache-2.0 will be added with the Phase 1 skeleton.
+Apache-2.0. See [`LICENSE`](LICENSE).
