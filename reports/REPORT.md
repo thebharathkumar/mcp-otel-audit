@@ -191,3 +191,15 @@ jq -r '.. | objects | select(.level == "violation") | "\(.signal_name)\t\(.id)\t
 jq -r '.. | objects | select(.id == "missing_attribute") | .message' \
   captures/<target>.weaver.json | sort -u
 ```
+
+---
+
+## 8. Postscript: maintainer feedback (2026-04-28)
+
+Posted in the OpenTelemetry community Slack on the day this audit was published. Marcelo Trylesinski, who maintains Pydantic Logfire and is also a maintainer of the official `mcp` Python SDK, offered two pieces of context that adjust the framing of this snapshot:
+
+1. **Logfire's MCP instrumentation predates the OTel MCP semantic conventions.** The Logfire telemetry shape captured in `captures/logfire.json` was designed and shipped before the spec existed. The divergence from semconv `v1.40.0` is historical, not a refusal to track the spec, and the per-implementation finding in section 3.3 should be read with that in mind.
+
+2. **`mcp` v2 will ship native OpenTelemetry support.** The official `mcp` Python SDK is merging native OTel emission, and the four packages audited here are expected to become obsolete once v2 ships. This audit therefore documents a snapshot of a transition state rather than a steady state. A follow-up snapshot against `mcp` v2 should produce materially different numbers; the harness in this repo is set up to be re-run on demand.
+
+The findings in sections 2-5 still describe what each package emits today, which is what a user installing one of them right now will observe. The methodology, captures, and Weaver scoring are unchanged.
